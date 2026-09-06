@@ -4,10 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "dev:server": "cd server && npm run dev",
+    "dev:full": "concurrently --kill-others-on-fail --prefix-colors \"cyan,magenta\" --names \"frontend,backend\" \"npm run dev\" \"npm run dev:server\"",
     "build": "tsc && vite build",
+    "build:server": "cd server && npm run build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:server": "cd server && npx tsc --noEmit",
+    "install:all": "npm install && cd server && npm install"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -23,6 +28,7 @@
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.2",

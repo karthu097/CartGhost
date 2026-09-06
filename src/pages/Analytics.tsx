@@ -1,5 +1,6 @@
 import Header from '../components/layout/Header';
-import { mockCarts, revenueData, actionBreakdown } from '../data/mockData';
+import { revenueData, actionBreakdown } from '../data/mockData';
+import { useCartStore } from '../store/CartStore';
 import { formatCurrency, REASON_LABELS, ACTION_LABELS } from '../utils/formatters';
 import type { AbandonmentReason, RecoveryAction } from '../types';
 import {
@@ -32,8 +33,9 @@ function formatYAxis(v: number) {
 }
 
 export default function Analytics() {
+  const { carts, stats, totalRecoveredRevenue } = useCartStore();
   // Reason breakdown
-  const reasonCounts = mockCarts.reduce<Record<string, number>>((acc, cart) => {
+  const reasonCounts = carts.reduce<Record<string, number>>((acc, cart) => {
     const r = cart.aiDecision.reason;
     acc[r] = (acc[r] ?? 0) + 1;
     return acc;
@@ -42,11 +44,11 @@ export default function Analytics() {
   const reasonData = (Object.entries(reasonCounts) as [AbandonmentReason, number][]).map(([reason, count]) => ({
     name: REASON_LABELS[reason],
     count,
-    value: mockCarts.filter((c) => c.aiDecision.reason === reason).reduce((s, c) => s + c.cartValue, 0),
+    value: carts.filter((c) => c.aiDecision.reason === reason).reduce((s, c) => s + c.cartValue, 0),
   })).sort((a, b) => b.count - a.count);
 
   // Device breakdown
-  const deviceCounts = mockCarts.reduce<Record<string, { count: number; value: number }>>((acc, cart) => {
+  const deviceCounts = carts.reduce<Record<string, { count: number; value: number }>>((acc, cart) => {
     if (!acc[cart.deviceType]) acc[cart.deviceType] = { count: 0, value: 0 };
     acc[cart.deviceType].count++;
     acc[cart.deviceType].value += cart.cartValue;
@@ -60,7 +62,7 @@ export default function Analytics() {
   }));
 
   // Source breakdown
-  const sourceCounts = mockCarts.reduce<Record<string, number>>((acc, cart) => {
+  const sourceCounts = carts.reduce<Record<string, number>>((acc, cart) => {
     acc[cart.source] = (acc[cart.source] ?? 0) + 1;
     return acc;
   }, {});
@@ -70,7 +72,7 @@ export default function Analytics() {
   }));
 
   // Segment breakdown
-  const segmentCounts = mockCarts.reduce<Record<string, number>>((acc, cart) => {
+  const segmentCounts = carts.reduce<Record<string, number>>((acc, cart) => {
     const s = cart.customer.segment;
     acc[s] = (acc[s] ?? 0) + 1;
     return acc;
@@ -88,9 +90,9 @@ export default function Analytics() {
   }));
 
   // Conversion funnel
-  const total = mockCarts.length;
-  const sent = mockCarts.filter((c) => ['sent', 'converted', 'failed'].includes(c.actionStatus)).length;
-  const converted = mockCarts.filter((c) => c.actionStatus === 'converted').length;
+  const total = carts.length;
+  const sent = carts.filter((c) => ['sent', 'converted', 'failed'].includes(c.actionStatus)).length;
+  const converted = carts.filter((c) => c.actionStatus === 'converted').length;
   const funnelData = [
     { stage: 'Abandoned', value: total, fill: '#ef4444' },
     { stage: 'AI Analyzed', value: total, fill: '#6366f1' },
@@ -105,10 +107,10 @@ export default function Analytics() {
         {/* KPI Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Abandoned Value', value: formatCurrency(mockCarts.reduce((s, c) => s + c.cartValue, 0)) },
-            { label: 'Total Recovered', value: formatCurrency(mockCarts.filter(c => c.actionStatus === 'converted').reduce((s, c) => s + (c.recoveredRevenue ?? 0), 0)) },
-            { label: 'Avg Recovery Probability', value: `${Math.round(mockCarts.reduce((s, c) => s + c.aiDecision.recoveryProbability, 0) / mockCarts.length)}%` },
-            { label: 'Discount Rate', value: `${Math.round((mockCarts.filter(c => c.aiDecision.discountRecommended).length / mockCarts.length) * 100)}%` },
+            { label: 'Total Abandoned Value', value: formatCurrency(stats.totalAbandonedValue) },
+            { label: 'Total Recovered', value: formatCurrency(totalRecoveredRevenue) },
+            { label: 'Avg Recovery Probability', value: `${Math.round(carts.reduce((s, c) => s + c.aiDecision.recoveryProbability, 0) / Math.max(carts.length, 1))}%` },
+            { label: 'Discount Rate', value: `${Math.round((carts.filter(c => c.aiDecision.discountRecommended).length / Math.max(carts.length, 1)) * 100)}%` },
           ].map((kpi) => (
             <div key={kpi.label} className="card p-5">
               <p className="text-xs text-slate-500 mb-1">{kpi.label}</p>

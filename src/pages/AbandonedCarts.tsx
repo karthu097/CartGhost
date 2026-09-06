@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Filter, ShoppingCart, ChevronDown, ChevronUp, ArrowUpDown, Percent, ShieldCheck } from 'lucide-react';
 import Header from '../components/layout/Header';
 import Avatar from '../components/ui/Avatar';
 import ProgressBar from '../components/ui/ProgressBar';
 import EmptyState from '../components/ui/EmptyState';
-import { mockCarts } from '../data/mockData';
+import { useCartStore } from '../store/CartStore';
 import {
   formatCurrency,
   formatTimeAgo,
@@ -23,7 +23,15 @@ type SortDir = 'asc' | 'desc';
 
 export default function AbandonedCarts() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const { carts } = useCartStore();
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+
+  // Sync search param from header navigation
+  useEffect(() => {
+    const q = searchParams.get('search');
+    if (q !== null) setSearch(q);
+  }, [searchParams]);
   const [statusFilter, setStatusFilter] = useState<ActionStatus | 'all'>('all');
   const [reasonFilter, setReasonFilter] = useState<AbandonmentReason | 'all'>('all');
   const [discountFilter, setDiscountFilter] = useState<'all' | 'discount' | 'no_discount'>('all');
@@ -36,7 +44,7 @@ export default function AbandonedCarts() {
   };
 
   const filtered = useMemo(() => {
-    let list = [...mockCarts];
+    let list = [...carts];
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -73,7 +81,7 @@ export default function AbandonedCarts() {
     <div>
       <Header
         title="Abandoned Carts"
-        subtitle={`${mockCarts.length} carts · ${filtered.length} shown`}
+        subtitle={`${carts.length} carts · ${filtered.length} shown`}
       />
       <div className="p-6 space-y-4">
         {/* Filters */}

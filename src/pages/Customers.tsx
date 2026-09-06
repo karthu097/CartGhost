@@ -4,18 +4,19 @@ import { Search, Users, MapPin, ShoppingBag } from 'lucide-react';
 import Header from '../components/layout/Header';
 import Avatar from '../components/ui/Avatar';
 import EmptyState from '../components/ui/EmptyState';
-import { mockCarts } from '../data/mockData';
+import { useCartStore } from '../store/CartStore';
 import { formatCurrency, getSegmentColor, STATUS_COLORS, STATUS_LABELS } from '../utils/formatters';
 
 export default function Customers() {
   const navigate = useNavigate();
+  const { carts } = useCartStore();
   const [search, setSearch] = useState('');
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
 
   // Deduplicate customers from carts
   const customers = useMemo(() => {
     const seen = new Set<string>();
-    return mockCarts
+    return carts
       .filter((cart) => {
         if (seen.has(cart.customer.id)) return false;
         seen.add(cart.customer.id);

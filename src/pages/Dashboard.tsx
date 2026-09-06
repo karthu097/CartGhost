@@ -1,40 +1,22 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  ShoppingCart,
-  TrendingUp,
-  DollarSign,
-  Target,
-  Brain,
-  ShieldCheck,
-  ArrowRight,
-  Clock,
+  ShoppingCart, TrendingUp, DollarSign, Target,
+  Brain, ShieldCheck, ArrowRight, Clock,
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import Header from '../components/layout/Header';
 import StatCard from '../components/ui/StatCard';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
-import { dashboardStats, revenueData, actionBreakdown, mockCarts } from '../data/mockData';
+import { revenueData, actionBreakdown } from '../data/mockData';
+import { useCartStore } from '../store/CartStore';
 import {
-  formatCurrency,
-  formatTimeAgo,
-  ACTION_LABELS,
-  STATUS_COLORS,
-  STATUS_LABELS,
-  REASON_LABELS,
-  REASON_COLORS,
+  formatCurrency, formatTimeAgo,
+  ACTION_LABELS, STATUS_COLORS, STATUS_LABELS,
+  REASON_LABELS, REASON_COLORS,
 } from '../utils/formatters';
 
 const PIE_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
@@ -47,7 +29,9 @@ function formatYAxis(value: number) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const recentCarts = [...mockCarts]
+  const { carts, stats } = useCartStore();
+
+  const recentCarts = [...carts]
     .sort((a, b) => new Date(b.abandonedAt).getTime() - new Date(a.abandonedAt).getTime())
     .slice(0, 8);
 
@@ -58,80 +42,75 @@ export default function Dashboard() {
 
   return (
     <div>
-      <Header
-        title="Dashboard"
-        subtitle="Real-time AI cart recovery overview"
-      />
+      <Header title="Dashboard" subtitle="Real-time AI cart recovery overview" />
       <div className="p-6 space-y-6">
-        {/* Stats Grid */}
+
+        {/* Stats Row 1 */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Abandoned Value"
-            value={formatCurrency(dashboardStats.totalAbandonedValue)}
-            subtitle="Last 30 days"
+            value={formatCurrency(stats.totalAbandonedValue)}
+            subtitle={`${stats.totalAbandonedCarts} carts`}
             icon={ShoppingCart}
             iconBg="bg-red-50"
             iconColor="text-red-500"
-            trend={{ value: 12.4, label: 'vs last month' }}
           />
           <StatCard
             title="Recoverable Revenue"
-            value={formatCurrency(dashboardStats.recoverableRevenue)}
-            subtitle="AI-identified opportunities"
+            value={formatCurrency(stats.recoverableRevenue)}
+            subtitle="Based on AI recovery scores"
             icon={DollarSign}
             iconBg="bg-green-50"
             iconColor="text-green-500"
-            trend={{ value: 18.7, label: 'vs last month' }}
           />
           <StatCard
             title="Recovery Rate"
-            value={`${dashboardStats.recoveryRate}%`}
-            subtitle="Carts successfully recovered"
+            value={`${stats.recoveryRate}%`}
+            subtitle={`${stats.cartsRecoveredToday > 0 ? `${stats.cartsRecoveredToday} recovered today` : 'Carts converted'}`}
             icon={TrendingUp}
             iconBg="bg-brand-50"
             iconColor="text-brand-600"
-            trend={{ value: 3.2, label: 'vs last month' }}
           />
           <StatCard
             title="AI Success Rate"
-            value={`${dashboardStats.aiSuccessRate}%`}
-            subtitle="AI recommendations converted"
+            value={`${stats.aiSuccessRate}%`}
+            subtitle="Actioned carts converted"
             icon={Brain}
             iconBg="bg-purple-50"
             iconColor="text-purple-600"
-            trend={{ value: 5.8, label: 'vs last month' }}
           />
         </div>
 
+        {/* Stats Row 2 */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Abandoned Carts"
-            value={String(dashboardStats.totalAbandonedCarts)}
-            subtitle="Active this week"
+            value={String(stats.totalAbandonedCarts)}
+            subtitle={`${carts.filter(c=>c.actionStatus==='pending').length} pending action`}
             icon={ShoppingCart}
             iconBg="bg-orange-50"
             iconColor="text-orange-500"
           />
           <StatCard
             title="Avg Cart Value"
-            value={formatCurrency(dashboardStats.averageCartValue)}
+            value={formatCurrency(stats.averageCartValue)}
             subtitle="Per abandoned cart"
             icon={Target}
             iconBg="bg-teal-50"
             iconColor="text-teal-600"
           />
           <StatCard
-            title="Recovered Today"
-            value={String(dashboardStats.cartsRecoveredToday)}
-            subtitle="Carts converted today"
+            title="Carts Recovered"
+            value={String(carts.filter(c => c.actionStatus === 'converted').length)}
+            subtitle="Total conversions"
             icon={ShieldCheck}
             iconBg="bg-green-50"
             iconColor="text-green-600"
           />
           <StatCard
             title="Discounts Avoided"
-            value={String(dashboardStats.discountsAvoided)}
-            subtitle="This month by AI"
+            value={String(stats.discountsAvoided)}
+            subtitle="Non-discount recoveries"
             icon={ShieldCheck}
             iconBg="bg-yellow-50"
             iconColor="text-yellow-600"
@@ -145,7 +124,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">Revenue Recovery Trend</h2>
-                <p className="text-xs text-slate-500">Abandoned vs recovered revenue (10 days)</p>
+                <p className="text-xs text-slate-500">10-day historical window</p>
               </div>
               <div className="flex items-center gap-4 text-xs">
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />Abandoned</span>
@@ -186,7 +165,7 @@ export default function Dashboard() {
           {/* AI Action Distribution */}
           <div className="card p-5">
             <h2 className="text-sm font-semibold text-slate-900 mb-1">AI Action Distribution</h2>
-            <p className="text-xs text-slate-500 mb-3">Recommended actions this month</p>
+            <p className="text-xs text-slate-500 mb-3">Recommended actions across all carts</p>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
@@ -255,15 +234,14 @@ export default function Dashboard() {
                     {ACTION_LABELS[cart.aiDecision.recommendedAction]}
                   </span>
                 </div>
-                <Badge
-                  className={STATUS_COLORS[cart.actionStatus]}
-                >
+                <Badge className={STATUS_COLORS[cart.actionStatus]}>
                   {STATUS_LABELS[cart.actionStatus]}
                 </Badge>
               </div>
             ))}
           </div>
         </div>
+
       </div>
     </div>
   );

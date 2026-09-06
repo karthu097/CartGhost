@@ -4,6 +4,8 @@ import type {
   AbandonmentReason,
   RecoveryAction,
 } from '../types';
+import { callBackendAnalyze, backendResponseToDecision } from '../services/aiService';
+export type { AISource } from '../services/aiService';
 
 /**
  * CartGhost AI Decision Engine
@@ -270,15 +272,36 @@ export function analyzeCartSync(cart: AbandonedCart): AIDecision {
 }
 
 /**
- * Async entry point — kept for CartDetail "Analyze with AI" button.
- * Simulates a real API call with a realistic delay.
- * Replace body with: return await callLLMAPI(cart);
+ * Async entry point — called by CartDetail "Analyze with AI" button.
+ *
+ * Flow:
+ *   1. POST cart data to /api/analyze (Express backend → Gemini)
+ *   2. If backend returns success → return Gemini decision
+ *   3. If backend is down / returns error / key missing → fallback to local engine
+ *
+ * Returns both the decision AND which source was used,
+ * so the UI can show "Gemini Active" vs "Demo Mode".
  */
-export async function analyzeCart(cart: AbandonedCart): Promise<AIDecision> {
-  // Simulate API latency (800ms–1.4s feels realistic for an AI call)
-  const delay = 800 + Math.floor((cart.cartValue % 7) * 89);
-  await new Promise((resolve) => setTimeout(resolve, delay));
-  return analyzeCartSync(cart);
+export async function analyzeCart(
+  cart: AbandonedCart
+): Promise<{ decision: AIDecision; source: 'gemini' | 'fallback' }> {
+  // Try the backend (which calls Gemini)
+  const backendResult = await callBackendAnalyze(cart);
+
+  if (backendResult !== null && backendResult.success === true) {
+    // Gemini responded with a valid structured decision
+    return {
+      decision: backendResponseToDecision(backendResult),
+      source: 'gemini',
+    };
+  }
+
+  // Backend unavailable, key missing, or Gemini error → use local engine
+  console.info('[CartGhost] Using local fallback engine for cart', cart.id);
+  return {
+    decision: analyzeCartSync(cart),
+    source: 'fallback',
+  };
 }
 
 export const ACTION_LABELS: Record<RecoveryAction, string> = {

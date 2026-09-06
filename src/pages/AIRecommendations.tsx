@@ -19,7 +19,8 @@ import {
 import Header from '../components/layout/Header';
 import Avatar from '../components/ui/Avatar';
 import ProgressBar from '../components/ui/ProgressBar';
-import { mockCarts, actionBreakdown } from '../data/mockData';
+import { actionBreakdown } from '../data/mockData';
+import { useCartStore } from '../store/CartStore';
 import { computeRevenueImpact } from '../engine/aiDecisionEngine';
 import {
   formatCurrency,
@@ -51,28 +52,28 @@ export default function AIRecommendations() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('all');
   const [actionFilter, setActionFilter] = useState<RecoveryAction | 'all'>('all');
-  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const { carts, updateCartStatus } = useCartStore();
 
   // Pre-compute derived lists from real AI decisions
   const highPriority = useMemo(
     () =>
-      [...mockCarts]
+      [...carts]
         .filter((c) => c.aiDecision.recoveryProbability >= 65 && c.actionStatus === 'pending')
         .sort((a, b) => b.aiDecision.recoveryProbability - a.aiDecision.recoveryProbability || b.cartValue - a.cartValue),
-    []
+    [carts]
   );
 
   const discountCarts = useMemo(
-    () => mockCarts.filter((c) => c.aiDecision.discountRecommended),
-    []
+    () => carts.filter((c) => c.aiDecision.discountRecommended),
+    [carts]
   );
 
   const noDiscountCarts = useMemo(
     () =>
-      mockCarts.filter(
+      carts.filter(
         (c) => !c.aiDecision.discountRecommended && c.actionStatus === 'pending'
       ),
-    []
+    [carts]
   );
 
   const tabCarts = useMemo(() => {
@@ -83,35 +84,35 @@ export default function AIRecommendations() {
         ? discountCarts
         : activeTab === 'no_discount'
         ? noDiscountCarts
-        : mockCarts.filter((c) => c.actionStatus === 'pending');
+        : carts.filter((c) => c.actionStatus === 'pending');
 
     if (actionFilter !== 'all') {
       base = base.filter((c) => c.aiDecision.recommendedAction === actionFilter);
     }
     return base;
-  }, [activeTab, actionFilter, highPriority, discountCarts, noDiscountCarts]);
+  }, [activeTab, actionFilter, highPriority, discountCarts, noDiscountCarts, carts]);
 
   // Unique action types present in pending carts (for filter dropdown)
   const pendingActions = useMemo(() => {
     const seen = new Set<RecoveryAction>();
-    for (const c of mockCarts) {
+    for (const c of carts) {
       if (c.actionStatus === 'pending') seen.add(c.aiDecision.recommendedAction);
     }
     return [...seen];
-  }, []);
+  }, [carts]);
 
   const totalExpectedRecovery = useMemo(
     () =>
-      mockCarts.reduce((sum, c) => {
+      carts.reduce((sum, c) => {
         const imp = computeRevenueImpact(c, c.aiDecision);
         return sum + imp.expectedRecovery;
       }, 0),
-    []
+    [carts]
   );
 
   const handleSend = (cartId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSentIds((prev) => new Set(prev).add(cartId));
+    updateCartStatus(cartId, 'sent');
   };
 
   // ─── render ────────────────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ export default function AIRecommendations() {
           {[
             {
               label: 'Total Analyzed',
-              value: mockCarts.length,
+              value: carts.length,
               icon: Brain,
               color: 'text-brand-600',
               bg: 'bg-brand-50',
@@ -146,7 +147,7 @@ export default function AIRecommendations() {
               icon: Percent,
               color: 'text-red-500',
               bg: 'bg-red-50',
-              sub: `${mockCarts.length - discountCarts.length} avoided`,
+              sub: `${carts.length - discountCarts.length} avoided`,
             },
             {
               label: 'Expected Recovery',
@@ -182,14 +183,14 @@ export default function AIRecommendations() {
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   CartGhost only recommends discounts when customer loyalty and cart value justify
-                  the cost. {mockCarts.length - discountCarts.length} out of {mockCarts.length} carts
+                  the cost. {carts.length - discountCarts.length} out of {carts.length} carts
                   will be recovered without any discount — protecting your margins.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-6 ml-auto flex-wrap">
               <div className="text-center">
-                <p className="text-lg font-bold text-green-600">{mockCarts.length - discountCarts.length}</p>
+                <p className="text-lg font-bold text-green-600">{carts.length - discountCarts.length}</p>
                 <p className="text-xs text-slate-500">No discount</p>
               </div>
               <div className="text-center">
@@ -198,7 +199,7 @@ export default function AIRecommendations() {
               </div>
               <div className="text-center">
                 <p className="text-lg font-bold text-brand-600">
-                  {Math.round(((mockCarts.length - discountCarts.length) / mockCarts.length) * 100)}%
+                  {Math.round(((carts.length - discountCarts.length) / carts.length) * 100)}%
                 </p>
                 <p className="text-xs text-slate-500">Margin protected</p>
               </div>
@@ -237,7 +238,7 @@ export default function AIRecommendations() {
             <div className="flex">
               {(
                 [
-                  { key: 'all', label: 'All Pending', count: mockCarts.filter((c) => c.actionStatus === 'pending').length },
+                  { key: 'all', label: 'All Pending', count: carts.filter((c) => c.actionStatus === 'pending').length },
                   { key: 'high_priority', label: 'High Priority', count: highPriority.length },
                   { key: 'discount', label: 'Discount', count: discountCarts.length },
                   { key: 'no_discount', label: 'No Discount', count: noDiscountCarts.length },
@@ -310,7 +311,7 @@ export default function AIRecommendations() {
           <div className="divide-y divide-slate-50">
             {tabCarts.map((cart) => {
               const impact = computeRevenueImpact(cart, cart.aiDecision);
-              const wasSent = sentIds.has(cart.id);
+              const wasSent = cart.actionStatus !== 'pending';
               return (
                 <div
                   key={cart.id}
